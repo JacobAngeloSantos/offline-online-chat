@@ -1,123 +1,43 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html>
 <head>
-  <title>Online Chat (Converted from Offline)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: sans-serif; background: #222; color: #fff; padding: 10px; }
-    input, textarea, button, select { width: 100%; max-width: 400px; margin: 5px auto; padding: 10px; display: block; }
-    #messages { background: #111; padding: 10px; border-radius: 5px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
-    .message { border-bottom: 1px solid #444; padding: 5px 0; }
-    .danger { color: red; }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <title>Supabase Online Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <h2>Online Chat</h2>
   <div id="auth">
-    <input id="userInput" placeholder="Username">
-    <input id="passInput" type="password" placeholder="Password">
-    <button onclick="register()">Register</button>
+    <input id="loginUser" placeholder="Username">
+    <input id="loginPass" type="password" placeholder="Password">
     <button onclick="login()">Login</button>
-    <input id="newPass" type="password" placeholder="New Password">
-    <button onclick="resetPassword()">Reset Password</button>
-  </div>  <div id="chatApp" style="display:none">
-    <h3>Logged in as: <span id="userDisplay"></span></h3>
-    <select id="userFilter" onchange="loadMessages()">
-      <option value="all">All Users</option>
-    </select>
-    <div id="messages"></div>
-    <textarea id="chatInput" placeholder="Type a message..."></textarea>
-    <button onclick="sendMessage()">Send</button>
-    <button onclick="logout()">Logout</button>
-  </div>  <script>
-    const supabase = supabase.createClient(
+  </div>
+
+  <div id="chatApp" style="display:none">
+    Welcome, <span id="userDisplay"></span>
+  </div>
+
+  <script>
+    const supabase = createClient(
       "https://ybuliidqnovgqvwpcloj.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlidWxpaWRxbm92Z3F2d3BjbG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1OTM4NDYsImV4cCI6MjA2NjE2OTg0Nn0.MZJTlMKho3QQL5Z5wKORkBmCX1s49_pbeV6ZIFXeGlU"
+      "eyJhbGciOiJI..."
     );
 
-    let currentUser = null;
-
-    async function register() {
-      const username = document.getElementById("userInput").value;
-      const password = document.getElementById("passInput").value;
-      const { data, error } = await supabase.from("users").insert({ username, password });
-      if (error) return alert("Register failed: " + error.message);
-      alert("Registered!");
-    }
-
     async function login() {
-      const username = document.getElementById("userInput").value;
-      const password = document.getElementById("passInput").value;
-      const { data, error } = await supabase.from("users").select("*").eq("username", username).single();
-      if (error || data.password !== password) return alert("Login failed");
-      currentUser = username;
-      document.getElementById("userDisplay").innerText = username;
+      const u = document.getElementById("loginUser").value;
+      const p = document.getElementById("loginPass").value;
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("username", u)
+        .single();
+
+      if (error || data.password !== p) {
+        alert("Login failed");
+        return;
+      }
       document.getElementById("auth").style.display = "none";
       document.getElementById("chatApp").style.display = "block";
-      loadMessages();
+      document.getElementById("userDisplay").textContent = u;
     }
-
-    async function resetPassword() {
-      const username = document.getElementById("userInput").value;
-      const currentPass = document.getElementById("passInput").value;
-      const newPass = document.getElementById("newPass").value;
-      const { data, error } = await supabase.from("users").select("*").eq("username", username).single();
-      if (error || data.password !== currentPass) return alert("Wrong current password");
-      const { error: updateErr } = await supabase.from("users").update({ password: newPass }).eq("username", username);
-      if (updateErr) return alert("Failed to reset password");
-      alert("Password changed");
-    }
-
-    function logout() {
-      currentUser = null;
-      location.reload();
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById("chatInput");
-      const msg = input.value.trim();
-      if (!msg) return;
-      await supabase.from("messages").insert({ user: currentUser, msg, time: Date.now() });
-      input.value = "";
-      loadMessages();
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    function convertLinks(text) {
-      const safe = escapeHtml(text);
-      return safe.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
-    }
-
-    async function loadMessages() {
-      const container = document.getElementById("messages");
-      container.innerHTML = "";
-      const filter = document.getElementById("userFilter").value;
-      const { data: messages, error } = await supabase.from("messages").select("*").order("time");
-      const users = new Set(messages.map(m => m.user));
-      const userFilter = document.getElementById("userFilter");
-      userFilter.innerHTML = '<option value="all">All Users</option>';
-      users.forEach(u => {
-        const opt = document.createElement("option");
-        opt.value = u;
-        opt.textContent = u;
-        userFilter.appendChild(opt);
-      });
-      messages.forEach((m) => {
-        if (filter !== "all" && m.user !== filter) return;
-        const div = document.createElement("div");
-        div.className = "message";
-        const time = new Date(m.time).toLocaleTimeString();
-        div.innerHTML = `[${time}] <strong>${m.user}</strong>: ${convertLinks(m.msg)}`;
-        container.appendChild(div);
-      });
-      container.scrollTop = container.scrollHeight;
-    }
-
-    setInterval(() => currentUser && loadMessages(), 3000);
-  </script></body>
+  </script>
+</body>
 </html>
